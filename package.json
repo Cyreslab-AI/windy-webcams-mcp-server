@@ -1,0 +1,43 @@
+{
+  "name": "windy-webcam-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Windy Webcam Public API - Access live webcam feeds from around the world",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "tsc --watch",
+    "test": "node test-connectivity.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "windy",
+    "webcam",
+    "camera",
+    "weather",
+    "live-feed",
+    "streaming",
+    "geography",
+    "location"
+  ],
+  "author": "AI Agent",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "build/**/*",
+    "README.md",
+    "LICENSE"
+  ]
+}
