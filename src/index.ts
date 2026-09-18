@@ -31,6 +31,174 @@ import {
   CacheEntry
 } from './types/windy-types.js';
 
+// ---------------------------------------------------------------------------
+// Reusable JSON Schema fragments for `outputSchema`, mirroring the shapes
+// declared in src/types/windy-types.ts. Every tool response is wrapped by
+// formatResponse()/formatError() into an object envelope
+// { success, summary, data, cached, api_info }, so the schema root is always
+// a plain object even for tools whose `data` is itself an array (e.g.
+// get_map_clusters, get_categories, get_countries/regions/continents).
+// ---------------------------------------------------------------------------
+
+const WEBCAM_CATEGORY_SCHEMA = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+  },
+};
+
+const WEBCAM_LOCATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    latitude: { type: 'number' },
+    longitude: { type: 'number' },
+    city: { type: 'string' },
+    city_code: { type: 'string' },
+    region: { type: 'string' },
+    region_code: { type: 'string' },
+    country: { type: 'string' },
+    country_code: { type: 'string' },
+    continent: { type: 'string' },
+    continent_code: { type: 'string' },
+  },
+};
+
+const WEBCAM_PLAYER_SCHEMA = {
+  type: 'object',
+  properties: {
+    live: { type: 'string' },
+    day: { type: 'string' },
+    month: { type: 'string' },
+    year: { type: 'string' },
+    lifetime: { type: 'string' },
+  },
+};
+
+const WEBCAM_URLS_SCHEMA = {
+  type: 'object',
+  properties: {
+    detail: { type: 'string' },
+    edit: { type: 'string' },
+    provider: { type: 'string' },
+  },
+};
+
+const WEBCAM_SCHEMA = {
+  type: 'object',
+  properties: {
+    webcamId: { type: 'number' },
+    title: { type: 'string' },
+    status: {
+      type: 'string',
+      enum: ['active', 'inactive', 'unapproved', 'disabled', 'rejected', 'duplicate', 'merged'],
+    },
+    viewCount: { type: 'number' },
+    lastUpdatedOn: { type: 'string' },
+    clusterSize: { type: 'number', description: 'Only present on /map/clusters results' },
+    categories: { type: 'array', items: WEBCAM_CATEGORY_SCHEMA },
+    images: {
+      type: 'object',
+      properties: {
+        current: { type: 'object' },
+        daylight: { type: 'object' },
+        sizes: { type: 'object' },
+      },
+    },
+    location: WEBCAM_LOCATION_SCHEMA,
+    player: WEBCAM_PLAYER_SCHEMA,
+    urls: WEBCAM_URLS_SCHEMA,
+  },
+  required: ['webcamId', 'title', 'status', 'viewCount', 'lastUpdatedOn'],
+};
+
+const WEBCAMS_LIST_DATA_SCHEMA = {
+  type: 'object',
+  properties: {
+    total: { type: 'number' },
+    webcams: { type: 'array', items: WEBCAM_SCHEMA },
+  },
+  required: ['total', 'webcams'],
+};
+
+const CATEGORY_SCHEMA = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+  },
+  required: ['id', 'name'],
+};
+
+const GEO_REGION_SCHEMA = {
+  type: 'object',
+  properties: {
+    code: { type: 'string' },
+    name: { type: 'string' },
+  },
+  required: ['code', 'name'],
+};
+
+const EXPORT_WEBCAM_SCHEMA = {
+  type: 'object',
+  properties: {
+    status: { type: 'string' },
+    webcamId: { type: 'number' },
+    title: { type: 'string' },
+    viewCount: { type: 'number' },
+    preview: { type: 'string' },
+    hasPanorama: { type: 'boolean' },
+    hasLivestream: { type: 'boolean' },
+    categories: { type: 'array', items: { type: 'string' } },
+    location: {
+      type: 'object',
+      properties: {
+        latitude: { type: 'number' },
+        longitude: { type: 'number' },
+        regionCode: { type: 'string' },
+        countryCode: { type: 'string' },
+        continentCode: { type: 'string' },
+      },
+      required: ['latitude', 'longitude'],
+    },
+  },
+  required: ['status', 'webcamId', 'title', 'viewCount', 'preview', 'hasPanorama', 'hasLivestream', 'categories', 'location'],
+};
+
+const EXPORT_DATA_SCHEMA = {
+  type: 'object',
+  properties: {
+    updatedOn: { type: 'string' },
+    webcams: { type: 'array', items: EXPORT_WEBCAM_SCHEMA },
+  },
+  required: ['updatedOn', 'webcams'],
+};
+
+const API_INFO_SCHEMA = {
+  type: 'object',
+  properties: {
+    rate_limit_remaining: { type: 'number' },
+    cache_hit: { type: 'boolean' },
+    response_time_ms: { type: 'number' },
+  },
+};
+
+// Builds the standard `{ success, summary, data, cached, api_info }` envelope
+// schema for a given tool's `data` shape.
+function toolResponseSchema(dataSchema: object) {
+  return {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean' },
+      summary: { type: 'string' },
+      data: dataSchema,
+      cached: { type: 'boolean' },
+      api_info: API_INFO_SCHEMA,
+    },
+    required: ['success', 'summary'],
+  };
+}
+
 class WindyWebcamServer {
   private server: Server;
   private axiosInstance: AxiosInstance;
@@ -205,6 +373,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(WEBCAMS_LIST_DATA_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -284,6 +453,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(WEBCAM_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -310,6 +480,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(WEBCAMS_LIST_DATA_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -353,6 +524,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(WEBCAMS_LIST_DATA_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -396,6 +568,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(WEBCAMS_LIST_DATA_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -438,6 +611,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema({ type: 'array', items: WEBCAM_SCHEMA }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -486,6 +660,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema({ type: 'array', items: CATEGORY_SCHEMA }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -503,6 +678,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema({ type: 'array', items: GEO_REGION_SCHEMA }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -520,6 +696,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema({ type: 'array', items: GEO_REGION_SCHEMA }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -537,6 +714,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema({ type: 'array', items: GEO_REGION_SCHEMA }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -554,6 +732,7 @@ class WindyWebcamServer {
             readOnlyHint: true,
             openWorldHint: true,
           },
+          outputSchema: toolResponseSchema(EXPORT_DATA_SCHEMA),
           inputSchema: {
             type: 'object',
             properties: {
@@ -623,7 +802,12 @@ class WindyWebcamServer {
           content: [{
             type: 'text',
             text: JSON.stringify(result, null, 2)
-          }]
+          }],
+          // `result` is always a plain object envelope ({ success, summary,
+          // data, cached, api_info }) even when `data` itself is a bare
+          // array (e.g. get_map_clusters/get_categories/get_countries), so
+          // this never assigns an array as the structuredContent root.
+          structuredContent: result as unknown as Record<string, unknown>,
         };
       } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
