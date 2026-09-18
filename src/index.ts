@@ -2,26 +2,20 @@
 
 /**
  * Windy Webcam MCP Server v1.0.0
- * 
+ *
  * This MCP server provides access to the Windy Webcam Public API which contains:
  * - Live webcam feeds from around the world
  * - Webcam filtering by location, category, and other criteria
  * - Geographic clustering for map display
  * - Detailed webcam information including images, timelapses, and live players
  * - Categories and geographic region data
- * 
+ *
  * The Windy Webcam API requires an API key for access.
  * API documentation: https://api.windy.com/webcams/docs
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ErrorCode,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { Server, ProtocolError, ProtocolErrorCode } from "@modelcontextprotocol/server";
 import axios, { AxiosInstance } from 'axios';
 import {
   WindyWebcam,
@@ -204,7 +198,7 @@ class WindyWebcamServer {
   }
 
   private setupToolHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    this.server.setRequestHandler('tools/list', async (): Promise<any> => ({
       tools: [
         {
           name: 'search_webcams',
@@ -483,7 +477,7 @@ class WindyWebcamServer {
       ],
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler('tools/call', async (request) => {
       try {
         const startTime = Date.now();
         let result: WindyToolResponse;
@@ -523,8 +517,8 @@ class WindyWebcamServer {
             result = await this.exportAllWebcams(request.params.arguments);
             break;
           default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
+            throw new ProtocolError(
+              ProtocolErrorCode.MethodNotFound,
               `Unknown tool: ${request.params.name}`
             );
         }
@@ -618,7 +612,7 @@ class WindyWebcamServer {
   private async getWebcam(args: any): Promise<WindyToolResponse> {
     const webcamId = args.webcam_id;
     if (!webcamId) {
-      throw new McpError(ErrorCode.InvalidParams, 'webcam_id is required');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'webcam_id is required');
     }
 
     const params = {
@@ -640,7 +634,7 @@ class WindyWebcamServer {
     const { location_type, location_code } = args;
     
     if (!location_type || !location_code) {
-      throw new McpError(ErrorCode.InvalidParams, 'location_type and location_code are required');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'location_type and location_code are required');
     }
 
     const params: WindyWebcamSearchParams = {
@@ -664,7 +658,7 @@ class WindyWebcamServer {
   private async getWebcamsByCategory(args: any): Promise<WindyToolResponse> {
     const categories = args.categories;
     if (!categories) {
-      throw new McpError(ErrorCode.InvalidParams, 'categories parameter is required');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'categories parameter is required');
     }
 
     const params: WindyWebcamSearchParams = {
@@ -689,7 +683,7 @@ class WindyWebcamServer {
     const { latitude, longitude } = args;
     
     if (latitude === undefined || longitude === undefined) {
-      throw new McpError(ErrorCode.InvalidParams, 'latitude and longitude are required');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'latitude and longitude are required');
     }
 
     const params: WindyWebcamSearchParams = {
@@ -712,7 +706,7 @@ class WindyWebcamServer {
     const { ne_lat, ne_lng, sw_lat, sw_lng } = args;
     
     if (ne_lat === undefined || ne_lng === undefined || sw_lat === undefined || sw_lng === undefined) {
-      throw new McpError(ErrorCode.InvalidParams, 'Bounding box coordinates (ne_lat, ne_lng, sw_lat, sw_lng) are required');
+      throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Bounding box coordinates (ne_lat, ne_lng, sw_lat, sw_lng) are required');
     }
 
     const params: WindyMapClusterParams = {
