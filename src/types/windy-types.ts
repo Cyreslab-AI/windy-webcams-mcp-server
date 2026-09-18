@@ -1,198 +1,178 @@
 /**
- * TypeScript type definitions for Windy Webcam API
+ * TypeScript type definitions for Windy Webcam API v3
  * API Documentation: https://api.windy.com/webcams/docs
+ *
+ * v3 responses are NOT wrapped in a `{ status, result }` envelope like the
+ * retired v2 API — each endpoint returns its data (object or array) directly.
  */
 
-// Base webcam information
+// Category tag attached to a webcam
+export interface WindyWebcamCategory {
+  id: string;
+  name: string;
+}
+
+// Webcam location details (present when `include` contains "location")
+export interface WindyWebcamLocation {
+  latitude: number;
+  longitude: number;
+  city?: string;
+  city_code?: string;
+  region?: string;
+  region_code?: string;
+  country?: string;
+  country_code?: string;
+  continent?: string;
+  continent_code?: string;
+}
+
+// Webcam image URLs (present when `include` contains "images"); shape is
+// tier-dependent so it is kept loosely typed here.
+export interface WindyWebcamImages {
+  current?: Record<string, any>;
+  daylight?: Record<string, any>;
+  sizes?: Record<string, any>;
+}
+
+// Embeddable player URLs (present when `include` contains "player")
+export interface WindyWebcamPlayer {
+  live?: string;
+  day?: string;
+  month?: string;
+  year?: string;
+  lifetime?: string;
+}
+
+// Webcam detail/action URLs (present when `include` contains "urls")
+export interface WindyWebcamUrls {
+  detail?: string;
+  edit?: string;
+  provider?: string;
+}
+
+// Base webcam information. Which optional fields are populated depends on
+// the `include` parameter sent with the request.
 export interface WindyWebcam {
-  id: string;
-  status: string;
+  webcamId: number;
   title: string;
-  image: {
-    current: {
-      icon: string;
-      thumbnail: string;
-      preview: string;
-      toenail: string;
-    };
-    sizes: {
-      icon: {
-        width: number;
-        height: number;
-      };
-      thumbnail: {
-        width: number;
-        height: number;
-      };
-      preview: {
-        width: number;
-        height: number;
-      };
-      toenail: {
-        width: number;
-        height: number;
-      };
-    };
-    daylight: {
-      icon: string;
-      thumbnail: string;
-      preview: string;
-      toenail: string;
-    };
-    update: number;
-  };
-  location: {
-    city: string;
-    region: string;
-    region_code: string;
-    country: string;
-    country_code: string;
-    continent: string;
-    continent_code: string;
-    latitude: number;
-    longitude: number;
-    timezone: string;
-  };
-  url: {
-    current: {
-      desktop: string;
-      mobile: string;
-    };
-    edit: string;
-    daylight: {
-      desktop: string;
-      mobile: string;
-    };
-  };
-  category?: string[];
-  player?: {
-    live: {
-      available: boolean;
-      embed: string;
-    };
-    day: {
-      available: boolean;
-      embed: string;
-    };
-    month: {
-      available: boolean;
-      embed: string;
-    };
-    year: {
-      available: boolean;
-      embed: string;
-    };
-  };
+  status: 'active' | 'inactive' | 'unapproved' | 'disabled' | 'rejected' | 'duplicate' | 'merged';
+  viewCount: number;
+  lastUpdatedOn: string;
+  clusterSize?: number; // only present on /map/clusters results
+  categories?: WindyWebcamCategory[];
+  images?: WindyWebcamImages;
+  location?: WindyWebcamLocation;
+  player?: WindyWebcamPlayer;
+  urls?: WindyWebcamUrls;
 }
 
-// Map cluster for optimized map display
-export interface WindyMapCluster {
-  id: string;
-  count: number;
-  lat: number;
-  lng: number;
-  webcams?: WindyWebcam[];
-}
-
-// Category information
+// Category information (GET /webcams/api/v3/categories)
 export interface WindyCategory {
   id: string;
   name: string;
 }
 
-// Geographic region information
+// Geographic region information (GET .../countries|regions|continents)
 export interface WindyGeoRegion {
   code: string;
   name: string;
 }
 
-// API Response wrapper
-export interface WindyApiResponse<T> {
-  status: string;
-  result: T;
-}
-
-// Webcams list response
+// GET /webcams/api/v3/webcams response
 export interface WindyWebcamsResponse {
-  offset: number;
-  limit: number;
   total: number;
   webcams: WindyWebcam[];
 }
 
-// Map clusters response
-export interface WindyMapClustersResponse {
-  clusters: WindyMapCluster[];
-}
+// GET /webcams/api/v3/webcams/{webcamId} response — the webcam object itself
+export type WindySingleWebcamResponse = WindyWebcam;
 
-// Single webcam response
-export interface WindySingleWebcamResponse {
-  webcam: WindyWebcam;
-}
+// GET /webcams/api/v3/map/clusters response — a bare array of representative
+// webcams; `clusterSize` on each entry indicates how many webcams it stands in for.
+export type WindyMapClustersResponse = WindyWebcam[];
 
-// Categories response
-export interface WindyCategoriesResponse {
-  categories: WindyCategory[];
-}
+// GET /webcams/api/v3/categories response — a bare array
+export type WindyCategoriesResponse = WindyCategory[];
 
-// Geographic regions response
-export interface WindyGeoRegionsResponse {
-  continents?: WindyGeoRegion[];
-  countries?: WindyGeoRegion[];
-  regions?: WindyGeoRegion[];
-}
+// GET /webcams/api/v3/countries|regions|continents response — a bare array
+export type WindyGeoRegionsResponse = WindyGeoRegion[];
 
-// Search parameters for webcams
+// Valid values for the v3 `include` parameter
+export type WindyIncludeValue = 'categories' | 'images' | 'location' | 'player' | 'urls';
+
+// Valid values for the v3 `sortKey` / `sortDirection` parameters
+export type WindySortKey = 'popularity' | 'createdOn';
+export type WindySortDirection = 'asc' | 'desc';
+
+// Search parameters for GET /webcams/api/v3/webcams.
+// Array-typed query parameters (categories, continents, countries, regions,
+// cities, webcamIds, include) are declared with OpenAPI `explode: false`,
+// meaning the API expects a single comma-separated string, e.g.
+// "categories=beach,city" — NOT repeated keys or `key[]=` notation.
 export interface WindyWebcamSearchParams {
-  show?: string; // Fields to include in response
-  lang?: string; // Language code (e.g., 'en', 'de', 'fr')
-  include?: string; // Additional data to include
-  exclude?: string; // Data to exclude
-  
-  // Geographic filters
-  continent?: string; // Continent code
-  country?: string; // Country code
-  region?: string; // Region code
-  nearby?: string; // Lat,lng coordinates for nearby search
-  bbox?: string; // Bounding box: sw_lat,sw_lng,ne_lat,ne_lng
-  
-  // Category filters
-  category?: string; // Category IDs (comma-separated)
-  webcam?: string; // Specific webcam IDs (comma-separated)
-  
+  lang?: string;
+  include?: string; // comma-separated WindyIncludeValue list
+
+  // Geographic filters (comma-separated geo codes)
+  continents?: string;
+  countries?: string;
+  regions?: string;
+  cities?: string;
+  nearby?: string; // "latitude,longitude,radiusKm" (radius max 250km)
+  bbox?: string; // "north_lat,east_lon,south_lat,west_lon"
+
+  // Category filters (comma-separated category ids, max 10)
+  categories?: string;
+  categoryOperation?: 'and' | 'or'; // requires `categories`; default "and"
+
+  // Direct lookup by id (comma-separated, max 50) — bypasses other filters
+  webcamIds?: string;
+
   // Pagination
-  offset?: number; // Result offset (default: 0)
-  limit?: number; // Number of results (default: 10, max: 50)
-  
-  // Ordering
-  order?: string; // Order by field (e.g., 'hotness', 'new', 'recent')
+  offset?: number; // default 0
+  limit?: number; // default 10, max 50
+
+  // Sorting
+  sortKey?: WindySortKey;
+  sortDirection?: WindySortDirection;
 }
 
-// Map cluster search parameters
+// Map cluster search parameters for GET /webcams/api/v3/map/clusters.
+// Note the v3 endpoint takes four discrete corner coordinates (and no
+// `cluster`/`limit` params, unlike the retired v2 contract).
 export interface WindyMapClusterParams {
-  ne?: string; // Northeast corner coordinates (lat,lng)
-  sw?: string; // Southwest corner coordinates (lat,lng)
-  zoom?: number; // Zoom level
-  cluster?: boolean; // Enable clustering
-  limit?: number; // Maximum number of webcams per cluster
-  include?: string; // Additional data to include
-  lang?: string; // Language code
+  northLat: number;
+  southLat: number;
+  eastLon: number;
+  westLon: number;
+  zoom: number; // 4-18
+  include?: string;
+  lang?: string;
 }
 
-// Export all webcams format
+// Export all webcams format (GET /webcams/export/all-webcams.json)
+export interface WindyExportWebcamLocation {
+  latitude: number;
+  longitude: number;
+  regionCode?: string;
+  countryCode?: string;
+  continentCode?: string;
+}
+
 export interface WindyExportWebcam {
-  id: string;
+  status: string;
+  webcamId: number;
   title: string;
   viewCount: number;
-  lastUpdatedOn: string;
-  webcamUrl: string;
-  previewUrl: string;
-  lat: number;
-  lng: number;
-  locationText: string;
+  preview: string;
+  hasPanorama: boolean;
+  hasLivestream: boolean;
+  categories: string[];
+  location: WindyExportWebcamLocation;
 }
 
 export interface WindyExportResponse {
+  updatedOn: string;
   webcams: WindyExportWebcam[];
 }
 
@@ -215,14 +195,11 @@ export interface WindyServerConfig {
   userAgent: string;
 }
 
-// Error types
+// Error shape returned by the live API (NestJS-style error body)
 export interface WindyApiError {
-  status: string;
-  error: {
-    code: number;
-    message: string;
-    details?: string;
-  };
+  statusCode: number;
+  message: string | string[];
+  error?: string;
 }
 
 // Tool response format
